@@ -7,7 +7,7 @@ using KwsmLab.OpenCvSharp;
 
 namespace CVcs.Analysis
 {
-    class ReconstructRGB
+    class ReconstructValue
     {
         // グローバル宣言
         IplImage src_img, dst_img;  // 画像
@@ -21,67 +21,73 @@ namespace CVcs.Analysis
         int dimension;
         int numImage, inline = 1;
         int FlagOfFirst = -1;
-        
+
         // 再構成画像の名前[string inputstr]
 
-        public ReconstructRGB(int StartFile, int RangeOfRec)
+        public ReconstructValue(int StartFile, int RangeOfRec)
         {
-            for (int i = StartFile; i < StartFile + RangeOfRec; i++)
+            using (CvMat bw_mat = Cv.CreateMat(Constants.LEARNING_DATA, RangeOfRec, MatrixType.F32C1))
             {
-                // フォルダ作成のため
-                string inputstr = i + ".jpg";
-                inputfile_name = inputstr;
 
-                //===== 画像処理(PCA) =====//
-                Console.Write("--- Reconstruct RGB ---\n");
-                Console.Write("Please Input Folder Name -> ");
-
-                // ユーザーの入力したフォルダを1行読み込む
-                //folder = "../../Data/Images/" + Console.ReadLine();
-
-                Console.Write(inputstr + "\n");
-                folder = "../../Data/Images/" + "MaVICPlus"; // フォルダを指定
-                savefolder = "../../Data/Savefile/";
-
-                //----- 画像の読み込み -----//
-                ReadOneImage();
-
-                //----- 平均画像(平均顔) -----//
-                Console.Write("Mean ... ");
-                filename = savefolder + "Mean_mat.csv"; // 入力ファイル名(固有ベクトル)
-                ReadMat(mean_mat, filename);
-                Console.Write("OK\n");
-
-                if (FlagOfFirst < 0)
+                for (int i = StartFile; i < StartFile + RangeOfRec; i++)
                 {
-                    // src_matと同じ行列の大きさ
-                    evect_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1);
-                    pjt_matT = Cv.CreateMat(numImage, inline, MatrixType.F32C1);
+                    // フォルダ作成のため
+                    string inputstr = i + ".jpg";
+                    //string inputstr = i.ToString("000") + ".jpg";
+                    inputfile_name = inputstr;
 
-                    //----- 固有ベクトルの読み込み -----//
-                    Console.Write("EigenVector Mat Read ... ");
-                    filename = savefolder + "Evect_mat.csv"; // 入力ファイル名(固有ベクトル)
-                    ReadMat(evect_mat, filename);
+                    //===== 画像処理(PCA) =====//
+                    Console.Write("--- Reconstruct RGB ---\n");
+                    Console.Write("Please Input Folder Name -> ");
+
+                    // ユーザーの入力したフォルダを1行読み込む
+                    //folder = "../../Data/Images/" + Console.ReadLine();
+
+                    Console.Write(inputstr + "\n");
+                    folder = "../../Data/Images/" + "MaVICPlus"; // フォルダを指定
+                    savefolder = "../../Data/Savefile/";
+
+                    //----- 画像の読み込み -----//
+                    ReadOneImage();
+
+                    //----- 平均画像(平均顔) -----//
+                    Console.Write("Mean ... ");
+                    filename = savefolder + "Mean_mat.csv"; // 入力ファイル名(固有ベクトル)
+                    ReadMat(mean_mat, filename);
                     Console.Write("OK\n");
-                    FlagOfFirst = 1;
-                }
 
-                //----- 投影(射影) -----//
-                Console.Write("Projection ... ");
-                Projection(evect_mat, inputstr);
-                Console.Write("OK\n");
+                    if (FlagOfFirst < 0)
+                    {
+                        // src_matと同じ行列の大きさ
+                        evect_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1);
+                        pjt_matT = Cv.CreateMat(numImage, inline, MatrixType.F32C1);
+
+                        //----- 固有ベクトルの読み込み -----//
+                        Console.Write("EigenVector Mat Read ... ");
+                        filename = savefolder + "Evect_mat.csv"; // 入力ファイル名(固有ベクトル)
+                        ReadMat(evect_mat, filename);
+                        Console.Write("OK\n");
+                        FlagOfFirst = 1;
+                    }
+
+                    //----- 投影(射影) -----//
+                    Console.Write("Projection ... ");
+                    Projection(evect_mat, inputstr);
+                    Cv.Transpose(pjt_mat, pjt_matT);
+                    LineSetMat(pjt_matT, bw_mat, i-1);
+                    Console.Write("OK\n");
+
+                    //----- 再構成 -----//
+                    Console.Write("Reconstitution ... ");
+                    //Reconstitution(evect_mat);
+                    Reconstitution_Kai(evect_mat, i);
+                    Console.Write("OK\n");
+                }
 
                 //----- 投影行列の書き出し -----//
                 Console.Write("Projection Mat Write ... ");
-                Cv.Transpose(pjt_mat, pjt_matT);
-                filename = savefolder + "Confference/" + "cf_(" + inputstr + ")" + ".csv";
-                WriteMat(pjt_matT, filename);
-                Console.Write("OK\n");
-
-                //----- 再構成 -----//
-                Console.Write("Reconstitution ... ");
-                Reconstitution(evect_mat);
-                //Reconstitution_Kai(evect_mat);
+                filename = savefolder + "Confference.csv";
+                WriteMat(bw_mat, filename);
                 Console.Write("OK\n");
             }
         }
@@ -91,6 +97,7 @@ namespace CVcs.Analysis
         {
             // 1枚画像を読み込む(サイズの決定)
             filename = folder + "/" + "1.jpg"; //指定した画像形式で読み込む
+            //filename = folder + "/" + "001.jpg"; //指定した画像形式で読み込む
             src_img = Cv.LoadImage(filename, LoadMode.Color);
 
             // 行列の設定
@@ -191,7 +198,7 @@ namespace CVcs.Analysis
         }
 
         // 再構成改
-        public void Reconstitution_Kai(CvMat input_mat)
+        public void Reconstitution_Kai(CvMat input_mat, int no_img)
         {
             string name_folder = "";
             using (CvMat line_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
@@ -199,32 +206,35 @@ namespace CVcs.Analysis
             using (CvMat rec_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
             {
                 Cv.Zero(rec_mat); // 初期化(0)
-                //Cv.Add(rec_mat, mean_mat, rec_mat); // 平均顔を足す
+                Cv.Add(rec_mat, mean_mat, rec_mat); // 平均顔を足す
                 for (int i = 0; i < Constants.RECON_DATA; i++)
                 {
                     //Cv.Zero(rec_mat); // 初期化(0)
-
-                    // 指定した基底を抜き出して再構成
-                    //if (i == 1 && i == 2) i++;
-
+                    
                     // 1列を取り出す
                     LineGetMat(input_mat, line_mat, i);
                     Cv.ConvertScale(line_mat, line_mat, Cv.Get2D(pjt_mat, 0, i).Val0, 0);
                     Cv.Add(rec_mat, line_mat, rec_mat);
-                    ScaleTrans_Kai(rec_mat, scale_mat);
-                    MatToImg(scale_mat, dst_img);
+
+                    //ScaleTrans(rec_mat, scale_mat);
+                    //MatToImg(scale_mat, dst_img);
 
                     // 再構成顔の書き出し(フォルダ付き)
-                    name_folder = "Reconstitution/" + inputfile_name;
-                    Directory.CreateDirectory(savefolder + name_folder);
-                    filename = savefolder + name_folder + "/" + String.Format("{0:000}", i + 1) + ".jpg";
+                    //name_folder = "Reconstitution/" + inputfile_name;
+                    //Directory.CreateDirectory(savefolder + name_folder);
+                    //filename = savefolder + name_folder + "/" + String.Format("{0:000}", i + 1) + ".jpg";
 
                     // 再構成顔の書き出し(フォルダなし)
                     //filename = savefolder + "Reconstitution/" + inputfile_name;
 
-                    //filename = savefolder + "Reconstitution/" + String.Format("{0:000}", i + 1) + ".jpg";
-
-                    Cv.SaveImage(filename, dst_img);
+                    if (i == 2) //(累積寄与率70%)
+                    {
+                        ScaleTrans(rec_mat, scale_mat);
+                        MatToImg(scale_mat, dst_img);
+                        filename = savefolder + "Reconstitution/" + String.Format("{0:000}", no_img) + ".jpg";
+                        Cv.SaveImage(filename, dst_img);
+                        break;
+                    }
                 }
             }
         }
@@ -258,8 +268,8 @@ namespace CVcs.Analysis
             for (int i = 0; i < input_mat.Rows * input_mat.Cols; i++)
             {
                 // 最大濃度値:255
-                //val = (((Cv.Get2D(input_mat, i, 0) - min) / (max - min)) * 255); // 平均顔を加えない場合
-                val = (((Cv.Get2D(input_mat, i, 0) - min) / (max - min)) * max);
+                val = (((Cv.Get2D(input_mat, i, 0) - min) / (max - min)) * 255); // 平均顔を加えない場合
+                //val = (((Cv.Get2D(input_mat, i, 0) - min) / (max - min)) * max);
                 if (val > 255) val = 255;
                 else if (val < 0) val = 0;
                 Cv.Set2D(scale_mat, i, 0, (int)(val + 0.5));
@@ -369,6 +379,15 @@ namespace CVcs.Analysis
             }
         }
 
+        // 指定した1列(縦1行)セットする
+        public void LineSetMat(CvMat line_mat, CvMat output_mat, int col)
+        {
+            for (int i = 0; i < line_mat.Rows; i++)
+            {   // 1列取り出し
+                Cv.Set2D(output_mat, i, col, Cv.Get2D(line_mat, i, 0).Val0);
+            }
+        }
+
         // 行列の読み込み
         public void ReadMat(CvMat input_mat, string str)
         {
@@ -407,6 +426,7 @@ namespace CVcs.Analysis
                 {
                     for (int x = 0; x < input_mat.Width; x++)
                     {
+                        if (x != 0 && x != input_mat.Width) sw.Write(",");
                         sw.Write("{0} ", Cv.Get2D(input_mat, y, x).Val0);
                     }
                     sw.WriteLine(""); // 改行

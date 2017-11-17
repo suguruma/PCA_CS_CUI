@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CVcs1.0", "CVcs\CVcs1.0.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CVcs2.0", "CVcs\CVcs2.0.csproj", "{E73C22A6-B1CF-4DCD-9138-CCA2F3F8922B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CVcs3.0", "CVcs\CVcs3.0.csproj", "{A0EF617D-F34C-47B8-960F-51296751EDD6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{E73C22A6-B1CF-4DCD-9138-CCA2F3F8922B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E73C22A6-B1CF-4DCD-9138-CCA2F3F8922B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E73C22A6-B1CF-4DCD-9138-CCA2F3F8922B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A0EF617D-F34C-47B8-960F-51296751EDD6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A0EF617D-F34C-47B8-960F-51296751EDD6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A0EF617D-F34C-47B8-960F-51296751EDD6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A0EF617D-F34C-47B8-960F-51296751EDD6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

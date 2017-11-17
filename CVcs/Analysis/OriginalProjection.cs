@@ -27,8 +27,8 @@ namespace CVcs.Analysis
             // ユーザーの入力したフォルダを1行読み込む
             folder = "../../Data/Images/" + Console.ReadLine();
 
-            //Console.Write(inputstr + "\n");
-            //folder = "../../Data/Images/" + "ImageG"; // フォルダを指定
+            Console.Write(inputstr + "\n");
+            //folder = "../../Data/Images/" + "ImageB"; // フォルダを指定
             savefolder = "../../Data/Savefile/";
 
             //----- 画像の読み込み -----//
@@ -60,11 +60,6 @@ namespace CVcs.Analysis
                 Cv.Transpose(pjt_mat, pjt_matT);
                 filename = savefolder + "Confference/" + "cf_(" + inputstr + ")" + ".csv";
                 WriteMat(pjt_matT, filename);
-                Console.Write("OK\n");
-
-                //----- 再構成 -----//
-                Console.Write("Reconstitution ... ");
-                Reconstitution(evect_mat);
                 Console.Write("OK\n");
             }
         }

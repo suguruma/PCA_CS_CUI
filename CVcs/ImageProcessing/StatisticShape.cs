@@ -5,35 +5,31 @@ using System.Text;
 using System.IO;
 using KwsmLab.OpenCvSharp;
 
-namespace CVcs.Analysis
+namespace CVcs.ImageProcessing
 {
-    /* ～注意事項～
-     * 枚数と次元数が離れすぎていると正確な結果が得られない
-     * [88枚の時]
-     * 画像の大きさ(76*100)：○
-     * 小さい画像(23*30)や大きい画像(280*360)：×
-     */
-
-    class EigenfacesRGB
+    class StatisticShape
     {
         // グローバル宣言
-        IplImage src_img, dst_img;  // 画像
         CvMat src_mat;  // 原画像行列
         CvMat mean_mat, center_mat; // 平均&分散
         string folder, savefolder, filename; // ファイル位置，名前
-        int iWidth = 0, iHeight = 0, maxSize;
+        int maxSize;
         int dimension;
         int numImage, inline = 1;
+        //
+        string[] PointFilenames;
+        string[] PointFilename;      // パスなしファイル名/拡張子ありファイル名
+        string[] _PointFilename;    // 拡張子なしファイル名
 
         // 主成分分析 (メイン関数)
-        public EigenfacesRGB()
+        public StatisticShape()
         {
             //===== 画像処理(PCA) =====//
-            Console.Write("*** Image Processing of PCA ***\n");
+            Console.Write("*** Statistic Shape ***\n");
             Console.Write("Please Input Folder Name -> ");
 
             // ユーザーの入力したフォルダを1行読み込む
-            folder = "../../Data/Images/" + Console.ReadLine();
+            folder = "../../Data/Images/" + "BeautyMaVIC/3/";//Console.ReadLine();
             savefolder = "../../Data/Savefile/";
 
             //----- 画像の読み込み -----//
@@ -47,6 +43,8 @@ namespace CVcs.Analysis
             Mean();
             filename = savefolder + "Mean_mat.csv"; // 出力ファイル名(平均ベクトル)
             WriteMat(mean_mat, filename);
+            filename = savefolder + "Mean_mat.txt"; // 出力ファイル名(平均ベクトル)
+            WritePTS(mean_mat, filename);
             Console.Write("OK\n");
 
             //----- 分散(センタリング) -----//
@@ -79,7 +77,7 @@ namespace CVcs.Analysis
                     WriteMat(eval_mat, filename);
                     Console.Write("OK\n");
                 }
-                //----- 固有顔の書き出し -----//
+                //----- 固有形状の書き出し -----//
                 Console.Write("Eigen Image Write ... ");
                 EigenWrite(evect_mat, ori_evect_mat);
                 Console.Write("OK\n");
@@ -96,63 +94,68 @@ namespace CVcs.Analysis
         // 画像サイズ決定
         public void ReadOneImage()
         {
-            // 1枚画像を読み込む(サイズの決定)
-            filename = folder + "/" + "1.jpg"; //指定した画像形式で読み込む
-            //filename = folder + "/" + "001.jpg"; //指定した画像形式で読み込む
-            src_img = Cv.LoadImage(filename, LoadMode.Color);
-
+            PointFilenames = System.IO.Directory.GetFiles(folder, "*.txt");
+            
             // 行列の設定
-            iWidth = src_img.Width;		// 画像の縦幅
-            iHeight = src_img.Height;	// 画像の横幅
-            numImage = Constants.LEARNING_DATA;
-            maxSize = iWidth * iHeight;	// 画像サイズの定義
-            dimension = maxSize * 3;
+            numImage = PointFilenames.Count();
+            maxSize = 114;	// 画像サイズの定義
+            dimension = maxSize * 2;
             src_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1);
-            Cv.SetZero(src_mat);		// 初期化
-            Console.Write("Image Size [Width:" + iWidth + " Height:" + iHeight + "]\n"); // サイズ確認
-            dst_img = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 3);
+            Cv.SetZero(src_mat);		    // 初期化
         }
 
         // 画像読み込み
         public void ReadImage()
         {
-            for (int i = 0; i < numImage; i++)
+            PointFilenames = System.IO.Directory.GetFiles(folder, "*.txt");
+            PointFilename = new string[PointFilenames.Count()];     // パスなし
+            _PointFilename = new string[PointFilenames.Count()];    // +拡張子なし
+
+            for (int i = 0; i < PointFilenames.Count(); i++)
             {
-                // 入力ファイル
-                filename = folder + "/" + (i + 1) + ".jpg"; //指定した画像形式で読み込む
-                //filename = folder + "/" + (i + 1).ToString("000") + ".jpg"; //指定した画像形式で読み込む
-                src_img = Cv.LoadImage(filename, LoadMode.Color);
+                string[] SplitText;
+                SplitText = PointFilenames[i].Replace("\\", "/").Split('/');
+                string StrText = SplitText[SplitText.Count() - 1];
+                PointFilename[i] = StrText;
+                SplitText = StrText.Split('.');
+                _PointFilename[i] = SplitText[0];
+                //Console.WriteLine(PointFilename[i]);
 
-                // 書き出しファイル名
-                filename = savefolder + "Lerning/" + String.Format("{0:000}", i + 1) + ".jpg";
-                Cv.SaveImage(filename, src_img);
-
-                // 各画素を行列にセット
-                for (int j = 0; j < 3; j++)
+                string strText = "";
+                using (StreamReader sr = new StreamReader(@PointFilenames[i]))
                 {
-                    for (int y = 0; y < iHeight; y++)
+                    strText = sr.ReadToEnd();
+                }
+                // string.Splitで分割
+                string[] splitText1;
+                splitText1 = strText.Replace("\r\n", "\n").Split('\n');
+
+                int read_max_point = maxSize;       // 読み込みの最大点数
+                int pts_property = 12;          // プロパティの行数
+                int X, Y;
+                for (int j = pts_property; j < read_max_point + pts_property; j++)
+                {
+                    int jj = j - pts_property;
+                    string[] splitText2;
+                    splitText2 = splitText1[j].Split(' ');
+                    X = int.Parse(splitText2[5]);
+                    Y = int.Parse(splitText2[6]);
+
+                    // 各画素を行列にセット
+                    for (int k = 0; k < 2; k++)
                     {
-                        for (int x = 0; x < iWidth; x++)
+                        if (k % 2 == 1)
                         {
-                            if ((iWidth * y + x + j * maxSize) % 3 == 0)
-                            {   // R:0,3,6....
-                                Cv.Set2D(src_mat,
-                                    iWidth * y + x + j * maxSize, i, src_img[y, x].Val2); // R
-                            }
-                            else if ((iWidth * y + x + j * maxSize) % 3 == 1)
-                            {   // G:1,4,7....
-                                Cv.Set2D(src_mat,
-                                    iWidth * y + x + j * maxSize, i, src_img[y, x].Val1); // G
-                            }
-                            else
-                            {   // B:2,5,8....
-                                Cv.Set2D(src_mat,
-                                    iWidth * y + x + j * maxSize, i, src_img[y, x].Val0); // B
-                            }
+                            Cv.Set2D(src_mat, jj * 2 + 1, i, Y);
+                        }
+                        else
+                        {
+                            Cv.Set2D(src_mat, jj * 2, i, X);
                         }
                     }
                 }
             }
+            //PrintMat(src_mat);
         }
 
         // 平均行列
@@ -174,11 +177,6 @@ namespace CVcs.Analysis
             // スカラー倍
             double dScale = 1 / (double)numImage;
             Cv.ConvertScale(mean_mat, mean_mat, dScale, 0);
-
-            // 行列から画像へ
-            MatToImg(mean_mat, dst_img);
-            filename = savefolder + "mean_img.jpg";
-            Cv.SaveImage(filename, dst_img);
         }
 
         // 分散(センタリング)
@@ -247,13 +245,19 @@ namespace CVcs.Analysis
                     // 従来の固有ベクトル値に変換
                     LineGetMat(evect_mat, line_mat, i); // 1列を取り出す
                     Cv.MatMul(center_mat, line_mat, evect_matP);
-                    Normalization(evect_matP);  // 正規化
-                    ScaleTrans(evect_matP, scale_mat);
-                    MatToImg(scale_mat, dst_img);
+                    Normalization(evect_matP);  // 固有形状顔を表示したいときはコメントアウト
+
+                    // 平均形状に加算
+                    Cv.Zero(scale_mat);
+                    Cv.Add(scale_mat, mean_mat, scale_mat);
+                    Cv.Add(scale_mat, evect_matP, scale_mat);
+
+                    //ScaleTrans(evect_matP, scale_mat);
+                    //MatToTxt(scale_mat, dst_img);
 
                     // 固有画像(固有顔)の書き出し
-                    filename = savefolder + "Eigen/" + String.Format("{0:000}", i + 1) + ".jpg";
-                    Cv.SaveImage(filename, dst_img);
+                    filename = savefolder + "Eigen/" + String.Format("{0:000}", i + 1) + ".txt";
+                    WritePTS(scale_mat, filename);
 
                     // 変換した固有ベクトルを格納
                     for (int j = 0; j < dimension; j++)
@@ -281,93 +285,59 @@ namespace CVcs.Analysis
         // スケール変換
         public void ScaleTrans(CvMat input_mat, CvMat scale_mat)
         {
-            double maxR = -1, minR = 256;
-            double maxG = -1, minG = 256;
-            double maxB = -1, minB = 256;
+            double maxX = -100, minX = 3000;
+            double maxY = -100, minY = 2000;
+            double maxMeanX = -100, minMeanX = 3000;
+            double maxMeanY = -100, minMeanY = 2000;
             double val;
+            //for (int i = 0; i < input_mat.Rows * input_mat.Cols; i++)
             for (int i = 0; i < input_mat.Rows * input_mat.Cols; i++)
             {
                 // 最大値,最小値
                 val = Cv.Get2D(input_mat, i, 0);
-                if (i % 3 == 0)
+                if (i % 2 == 0)
                 {
-                    if (maxR < val) maxR = val;
-                    else if (minR > val) minR = val;
-                }
-                else if (i % 3 == 1)
-                {
-                    if (maxG < val) maxG = val;
-                    else if (minG > val) minG = val;
+                    if (maxX < val) maxX = val;
+                    else if (minX > val) minX = val;
                 }
                 else
                 {
-                    if (maxB < val) maxB = val;
-                    else if (minB > val) minB = val;
+                    if (maxY < val) maxY = val;
+                    else if (minY > val) minY = val;
                 }
             }
-            for (int i = 0; i < input_mat.Rows * input_mat.Cols; i++)
-            {
-                // 最大濃度値:255
-                if (i % 3 == 0)
-                    val = (((Cv.Get2D(input_mat, i, 0) - minR) / (maxR - minR)) * 255);
-                else if (i % 3 == 1)
-                    val = (((Cv.Get2D(input_mat, i, 0) - minG) / (maxG - minG)) * 255);
-                else
-                    val = (((Cv.Get2D(input_mat, i, 0) - minB) / (maxB - minB)) * 255);
-                if (val > 255) val = 255;
-                else if (val < 0) val = 0;
-                Cv.Set2D(scale_mat, i, 0, (int)(val + 0.5));
-            }
-            /*
-            double max = -1, min = 256;
-            double val;
-            for (int i = 0; i < input_mat.Rows * input_mat.Cols; i++)
+            // 平均の最大最小
+            for (int i = 0; i < dimension; i++)
             {
                 // 最大値,最小値
-                val = Cv.Get2D(input_mat, i, 0);
-                if (max < val) max = val;
-                else if (min > val) min = val;
+                val = Cv.Get2D(mean_mat, i, 0);
+                if (i % 2 == 0)
+                {
+                    if (maxMeanX < val) maxMeanX = val;
+                    else if (minMeanX > val) minMeanX = val;
+                }
+                else
+                {
+                    if (maxMeanY < val) maxMeanY = val;
+                    else if (minMeanY > val) minMeanY = val;
+                }
             }
             for (int i = 0; i < input_mat.Rows * input_mat.Cols; i++)
             {
-                // 最大濃度値:255
-                val = (((Cv.Get2D(input_mat, i, 0) - min) / (max - min)) * 255);
-                if (val > 255) val = 255;
-                else if (val < 0) val = 0;
-                Cv.Set2D(scale_mat, i, 0, (int)(val + 0.5));
-            }*/
-        }
-
-        // 行列から画像へ
-        public void MatToImg(CvMat input_mat, IplImage img)
-        {
-            using (IplImage imgR = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
-            using (IplImage imgG = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
-            using (IplImage imgB = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
-            {
-                // 各画素を行列にセット
-                for (int i = 0; i < 3; i++)
+                // 最大
+                if (i % 2 == 0)
                 {
-                    for (int y = 0; y < img.Height; y++)
-                    {
-                        for (int x = 0; x < img.Width; x++)
-                        {
-                            if ((iWidth * y + x + i * maxSize) % 3 == 0)
-                            {   // R:0,3,6....
-                                imgR[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // R
-                            }
-                            else if ((iWidth * y + x + i * maxSize) % 3 == 1)
-                            {   // G:1,4,7....
-                                imgG[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // G
-                            }
-                            else
-                            {   // B:2,5,8....
-                                imgB[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // B
-                            }
-                        }
-                    }
+                    val = (((Cv.Get2D(input_mat, i, 0) - minX) / (maxX - minX)) * maxMeanX);
+                    if (val > 3000) val = 3000;
+                    else if (val < 0) val = 0;
                 }
-                Cv.Merge(imgB, imgG, imgR, null, img);
+                else
+                {
+                    val = (((Cv.Get2D(input_mat, i, 0) - minY) / (maxY - minY)) * maxMeanY);
+                    if (val > 2000) val = 2000;
+                    else if (val < 0) val = 0;
+                }
+                Cv.Set2D(scale_mat, i, 0, (int)(val + 0.5));
             }
         }
 
@@ -418,6 +388,37 @@ namespace CVcs.Analysis
                         sw.Write("{0}, ", Cv.Get2D(input_mat, y, x).Val0);
                     }
                     sw.WriteLine(""); // 改行
+                }
+            }
+        }
+        public void WritePTS(CvMat input_mat, string filename)
+        {
+            // 時間取得
+            DateTime dt = DateTime.Now;
+
+            using (StreamWriter sw = new StreamWriter(@filename))
+            {
+                string str = filename;
+                string[] splitText = str.Split('.');
+
+                sw.WriteLine("*********************************************"); // 1行目
+                sw.WriteLine("*   FileType : {0} File", splitText[splitText.Count() - 1].ToUpper()); // 4行目
+                sw.WriteLine("*   DateTime : {0}.{1}.{2} [{3}:{4}:{5}]", dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second); // 3行目
+                sw.WriteLine("*   Written by AFIMsystem"); // 2行目
+                sw.WriteLine("*********************************************"); // 5行目
+                sw.WriteLine(""); // 6行目
+                sw.WriteLine("# Total Landmark number: {0}", maxSize); // 7行目
+                sw.WriteLine(""); // 8行目
+                sw.WriteLine("# Total Area number: 10"); // 9行目
+                sw.WriteLine("# Area number List: 0 1 2 3 4 5 6 7 8 9"); // 10行目
+                sw.WriteLine(""); // 11行目
+                sw.WriteLine("# Format: [Area_Number][Index_Numer_in_Area][Index_Numer][X][Y][ConnectFrom][ConnectTo]"); // 12行目
+
+                for (int i = 0; i < maxSize; i++)
+                {
+                    int X = (int)(Cv.Get2D(input_mat, i * 2, 0) + 0.5);
+                    int Y = (int)(Cv.Get2D(input_mat, i * 2 + 1, 0) + 0.5);
+                    sw.WriteLine("#  0 0 {0} {1} {2} 0 0", i, X, Y);
                 }
             }
         }
