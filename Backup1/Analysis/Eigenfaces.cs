@@ -7,14 +7,7 @@ using KwsmLab.OpenCvSharp;
 
 namespace CVcs.Analysis
 {
-    /* ～注意事項～
-     * 枚数と次元数が離れすぎていると正確な結果が得られない
-     * [88枚の時]
-     * 画像の大きさ(76*100)：○
-     * 小さい画像(23*30)や大きい画像(280*360)：×
-     */
-
-    class EigenfacesRGB
+    class Eigenfaces
     {
         // グローバル宣言
         IplImage src_img, dst_img;  // 画像
@@ -22,11 +15,10 @@ namespace CVcs.Analysis
         CvMat mean_mat, center_mat; // 平均&分散
         string folder, savefolder, filename; // ファイル位置，名前
         int iWidth = 0, iHeight = 0, maxSize;
-        int dimension;
         int numImage, inline = 1;
 
         // 主成分分析 (メイン関数)
-        public EigenfacesRGB()
+        public Eigenfaces()
         {
             //===== 画像処理(PCA) =====//
             Console.Write("*** Image Processing of PCA ***\n");
@@ -56,7 +48,7 @@ namespace CVcs.Analysis
 
             // src_matと同じ大きさ
             using (CvMat evect_mat = Cv.CreateMat(numImage, numImage, MatrixType.F32C1))
-            using (CvMat ori_evect_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1))
+            using (CvMat ori_evect_mat = Cv.CreateMat(maxSize, numImage, MatrixType.F32C1))
             using (CvMat pjt_matT = Cv.CreateMat(numImage, inline, MatrixType.F32C1))
             {
                 using (CvMat eval_mat = Cv.CreateMat(numImage, inline, MatrixType.F32C1))
@@ -90,6 +82,7 @@ namespace CVcs.Analysis
                 WriteMat(ori_evect_mat, filename);
                 Console.Write("OK\n");
             }
+            
             Console.WriteLine(); // 改行
         }
 
@@ -98,18 +91,17 @@ namespace CVcs.Analysis
         {
             // 1枚画像を読み込む(サイズの決定)
             filename = folder + "/" + "1.jpg"; //指定した画像形式で読み込む
-            src_img = Cv.LoadImage(filename, LoadMode.Color);
+            src_img = Cv.LoadImage(filename, LoadMode.GrayScale);
 
             // 行列の設定
             iWidth = src_img.Width;		// 画像の縦幅
             iHeight = src_img.Height;	// 画像の横幅
             numImage = Constants.LEARNING_DATA;
             maxSize = iWidth * iHeight;	// 画像サイズの定義
-            dimension = maxSize * 3;
-            src_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1);
+            src_mat = Cv.CreateMat(maxSize, numImage, MatrixType.F32C1);
             Cv.SetZero(src_mat);		// 初期化
             Console.Write("Image Size [Width:" + iWidth + " Height:" + iHeight + "]\n"); // サイズ確認
-            dst_img = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 3);
+            dst_img = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1);
         }
 
         // 画像読み込み
@@ -119,35 +111,18 @@ namespace CVcs.Analysis
             {
                 // 入力ファイル
                 filename = folder + "/" + (i + 1) + ".jpg"; //指定した画像形式で読み込む
-                src_img = Cv.LoadImage(filename, LoadMode.Color);
+                src_img = Cv.LoadImage(filename, LoadMode.GrayScale);
 
                 // 書き出しファイル名
                 filename = savefolder + "Lerning/" + String.Format("{0:000}", i + 1) + ".jpg";
                 Cv.SaveImage(filename, src_img);
 
                 // 各画素を行列にセット
-                for (int j = 0; j < 3; j++)
+                for (int y = 0; y < iHeight; y++)
                 {
-                    for (int y = 0; y < iHeight; y++)
+                    for (int x = 0; x < iWidth; x++)
                     {
-                        for (int x = 0; x < iWidth; x++)
-                        {
-                            if ((iWidth * y + x + j * maxSize) % 3 == 0)
-                            {   // R:0,3,6....
-                                Cv.Set2D(src_mat,
-                                    iWidth * y + x + j * maxSize, i, src_img[y, x].Val2); // R
-                            }
-                            else if ((iWidth * y + x + j * maxSize) % 3 == 1)
-                            {   // G:1,4,7....
-                                Cv.Set2D(src_mat,
-                                    iWidth * y + x + j * maxSize, i, src_img[y, x].Val1); // G
-                            }
-                            else
-                            {   // B:2,5,8....
-                                Cv.Set2D(src_mat,
-                                    iWidth * y + x + j * maxSize, i, src_img[y, x].Val0); // B
-                            }
-                        }
+                        Cv.Set2D(src_mat, iWidth * y + x, i, src_img[y, x]);
                     }
                 }
             }
@@ -157,17 +132,13 @@ namespace CVcs.Analysis
         public void Mean()
         {
             // 平均行列の取得
-            mean_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1);
+            mean_mat = Cv.CreateMat(maxSize, inline, MatrixType.F32C1);
             Cv.SetZero(mean_mat);
 
             // 読み込みデータの平均
             for (int y = 0; y < src_mat.Rows; y++)
-            {
                 for (int x = 0; x < src_mat.Cols; x++)
-                {
                     Cv.Set2D(mean_mat, y, 0, Cv.Get2D(mean_mat, y, 0).Val0 + Cv.Get2D(src_mat, y, x).Val0);
-                }
-            }
 
             // スカラー倍
             double dScale = 1 / (double)numImage;
@@ -182,22 +153,18 @@ namespace CVcs.Analysis
         // 分散(センタリング)
         public void Centering()
         {
-            center_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1);
+            center_mat = Cv.CreateMat(maxSize, numImage, MatrixType.F32C1);
             // センタリング行列
             for (int y = 0; y < center_mat.Rows; y++)
-            {
                 for (int x = 0; x < center_mat.Cols; x++)
-                {
                     Cv.Set2D(center_mat, y, x, (Cv.Get2D(src_mat, y, x).Val0 - Cv.Get2D(mean_mat, y, 0).Val0));
-                }
-            }
         }
 
         // 共分散行列
         public void VarianceCovariance(CvMat input_mat)
         {
             // 配列(変数)宣言(センタリング,共分散行列の作成)
-            using (CvMat center_matT = Cv.CreateMat(numImage, dimension, MatrixType.F32C1))
+            using (CvMat center_matT = Cv.CreateMat(numImage, maxSize, MatrixType.F32C1))
             using (CvMat line_mat = Cv.CreateMat(numImage, inline, MatrixType.F32C1))
             using (CvMat line_matT = Cv.CreateMat(inline, numImage, MatrixType.F32C1))
             using (CvMat vctmp_mat = Cv.CreateMat(numImage, numImage, MatrixType.F32C1))
@@ -205,7 +172,7 @@ namespace CVcs.Analysis
                 Cv.Transpose(center_mat, center_matT);
                 Cv.SetZero(input_mat);	// 初期化
                 // 中心化(センタリング)
-                for (int j = 0; j < dimension; j++)
+                for (int j = 0; j < maxSize; j++)
                 {
                     LineGetMat(center_matT, line_mat, j);
                     Cv.Transpose(line_mat, line_matT);
@@ -214,7 +181,7 @@ namespace CVcs.Analysis
                 }
             }
             // スカラー倍
-            double dScale = 1 / (double)dimension;
+            double dScale = 1 / (double)maxSize;
             Cv.ConvertScale(input_mat, input_mat, dScale, 0);
         }
 
@@ -236,8 +203,8 @@ namespace CVcs.Analysis
         // 固有顔の書き出し
         public void EigenWrite(CvMat evect_mat, CvMat ori_evect_mat)
         {
-            using (CvMat scale_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
-            using (CvMat evect_matP = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
+            using (CvMat scale_mat = Cv.CreateMat(maxSize, inline, MatrixType.F32C1))
+            using (CvMat evect_matP = Cv.CreateMat(maxSize, inline, MatrixType.F32C1))
             using (CvMat line_mat = Cv.CreateMat(numImage, inline, MatrixType.F32C1))
             {
                 for (int i = 0; i < numImage; i++)
@@ -254,7 +221,7 @@ namespace CVcs.Analysis
                     Cv.SaveImage(filename, dst_img);
 
                     // 変換した固有ベクトルを格納
-                    for (int j = 0; j < dimension; j++)
+                    for (int j = 0; j < maxSize; j++)
                     {
                         Cv.Set2D(ori_evect_mat, j, i, Cv.Get2D(evect_matP, j, 0).Val0);
                     }
@@ -299,35 +266,14 @@ namespace CVcs.Analysis
         }
 
         // 行列から画像へ
-        public void MatToImg(CvMat input_mat, IplImage img)
+        public void MatToImg(CvMat mat, IplImage img)
         {
-            using (IplImage imgR = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
-            using (IplImage imgG = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
-            using (IplImage imgB = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
+            for (int y = 0; y < img.Height; y++)
             {
-                // 各画素を行列にセット
-                for (int i = 0; i < 3; i++)
+                for (int x = 0; x < img.Width; x++)
                 {
-                    for (int y = 0; y < img.Height; y++)
-                    {
-                        for (int x = 0; x < img.Width; x++)
-                        {
-                            if ((iWidth * y + x + i * maxSize) % 3 == 0)
-                            {   // R:0,3,6....
-                                imgR[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // R
-                            }
-                            else if ((iWidth * y + x + i * maxSize) % 3 == 1)
-                            {   // G:1,4,7....
-                                imgG[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // G
-                            }
-                            else
-                            {   // B:2,5,8....
-                                imgB[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // B
-                            }
-                        }
-                    }
+                    img[y, x] = mat[img.Width * y + x, 0];
                 }
-                Cv.Merge(imgB, imgG, imgR, null, img);
             }
         }
 

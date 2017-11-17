@@ -7,7 +7,7 @@ using KwsmLab.OpenCvSharp;
 
 namespace CVcs.Analysis
 {
-    class OriginalProjection
+    class Reconstruct
     {
         // グローバル宣言
         IplImage src_img, dst_img;  // 画像
@@ -18,10 +18,10 @@ namespace CVcs.Analysis
         int numImage, inline = 1;
         // 再構成画像の名前[string inputstr]
 
-        public OriginalProjection(string inputstr)
+        public Reconstruct(string inputstr)
         {
             //===== 画像処理(PCA) =====//
-            Console.Write("--- OriginalProjection ---\n");
+            Console.Write("--- Reconstruct ---\n");
             Console.Write("Please Input Folder Name -> ");
 
             // ユーザーの入力したフォルダを1行読み込む

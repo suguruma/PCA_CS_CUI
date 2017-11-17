@@ -7,7 +7,7 @@ using KwsmLab.OpenCvSharp;
 
 namespace CVcs.Analysis
 {
-    class OriginalProjection
+    class OriginalProjectionRGB
     {
         // グローバル宣言
         IplImage src_img, dst_img;  // 画像
@@ -15,20 +15,20 @@ namespace CVcs.Analysis
         CvMat pjt_mat;  // 射影行列
         string folder, savefolder, filename; // ファイル位置，名前
         int iWidth = 0, iHeight = 0, maxSize;
+        int dimension;
         int numImage, inline = 1;
-        // 再構成画像の名前[string inputstr]
 
-        public OriginalProjection(string inputstr)
+        public OriginalProjectionRGB(int eigen_num, int pjt)
         {
             //===== 画像処理(PCA) =====//
-            Console.Write("--- OriginalProjection ---\n");
+            Console.Write("--- OriginalProjection RGB ---\n");
             Console.Write("Please Input Folder Name -> ");
 
             // ユーザーの入力したフォルダを1行読み込む
-            folder = "../../Data/Images/" + Console.ReadLine();
+            //folder = "../../Data/Images/" + Console.ReadLine();
 
-            //Console.Write(inputstr + "\n");
-            //folder = "../../Data/Images/" + "ImageG"; // フォルダを指定
+            Console.Write(eigen_num + "\n");
+            folder = "../../Data/Images/" + "MaVIC12"; // フォルダを指定
             savefolder = "../../Data/Savefile/";
 
             //----- 画像の読み込み -----//
@@ -36,12 +36,12 @@ namespace CVcs.Analysis
 
             //----- 平均画像(平均顔) -----//
             Console.Write("Mean ... ");
-            filename = savefolder + "Mean_mat.csv"; // 入力ファイル名(平均ベクトル)
+            filename = savefolder + "Mean_mat.csv"; // 入力ファイル名(固有ベクトル)
             ReadMat(mean_mat, filename);
             Console.Write("OK\n");
 
             // src_matと同じ大きさ
-            using (CvMat evect_mat = Cv.CreateMat(maxSize, numImage, MatrixType.F32C1))
+            using (CvMat evect_mat = Cv.CreateMat(dimension, numImage, MatrixType.F32C1))
             using (CvMat pjt_matT = Cv.CreateMat(numImage, inline, MatrixType.F32C1))
             {
                 //----- 固有ベクトルの読み込み -----//
@@ -52,19 +52,12 @@ namespace CVcs.Analysis
 
                 //----- 投影(射影) -----//
                 Console.Write("Projection ... ");
-                Projection(evect_mat, inputstr);
-                Console.Write("OK\n");
-
-                //----- 投影行列の書き出し -----//
-                Console.Write("Projection Mat Write ... ");
-                Cv.Transpose(pjt_mat, pjt_matT);
-                filename = savefolder + "Confference/" + "cf_(" + inputstr + ")" + ".csv";
-                WriteMat(pjt_matT, filename);
+                Projection(pjt);
                 Console.Write("OK\n");
 
                 //----- 再構成 -----//
                 Console.Write("Reconstitution ... ");
-                Reconstitution(evect_mat);
+                Reconstitution(evect_mat, eigen_num, pjt);
                 Console.Write("OK\n");
             }
         }
@@ -74,64 +67,59 @@ namespace CVcs.Analysis
         {
             // 1枚画像を読み込む(サイズの決定)
             filename = folder + "/" + "1.jpg"; //指定した画像形式で読み込む
-            src_img = Cv.LoadImage(filename, LoadMode.GrayScale);
+            src_img = Cv.LoadImage(filename, LoadMode.Color);
 
             // 行列の設定
             iWidth = src_img.Width;		// 画像の縦幅
             iHeight = src_img.Height;	// 画像の横幅
             numImage = Constants.LEARNING_DATA;
             maxSize = iWidth * iHeight;	// 画像サイズの定義
+            dimension = maxSize * 3;
             Console.Write("Image Size [Width:" + iWidth + " Height:" + iHeight + "]\n"); // サイズ確認
-            dst_img = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1);
-
+            dst_img = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 3);
+            
             // 平均行列の取得
-            mean_mat = Cv.CreateMat(maxSize, inline, MatrixType.F32C1);
+            mean_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1);
         }
 
         // 投影
-        public void Projection(CvMat input_mat, string inputstr)
+        public void Projection(int pjt)
         {
             // 画像から行列へ
             pjt_mat = Cv.CreateMat(inline, numImage, MatrixType.F32C1);
-            using (CvMat test_mat = Cv.CreateMat(inline, maxSize, MatrixType.F32C1))
+            for (int i = 0; i < pjt_mat.Rows * pjt_mat.Cols; i++)
             {
-                // 射影する画像を入力
-                filename = folder + "/" + inputstr; //Console.ReadLine();
-                using (IplImage input_img = Cv.LoadImage(filename, LoadMode.GrayScale))
-                {
-                    // 入力画像をセンタリングして格納(横1行で取得する)
-                    for (int y = 0; y < input_img.Height; y++)
-                        for (int x = 0; x < input_img.Width; x++)
-                            Cv.Set2D(test_mat, 0, x + y * input_img.Width,
-                                input_img[y, x] - Cv.Get2D(mean_mat, x + y * input_img.Width, 0));
-                }
-                Cv.MatMul(test_mat, input_mat, pjt_mat);
+                Cv.Set2D(pjt_mat, 0, i, pjt);
             }
         }
 
         // 再構成
-        public void Reconstitution(CvMat input_mat)
+        public void Reconstitution(CvMat input_mat, int eigen_num, int pjt)
         {
-            using (CvMat line_mat = Cv.CreateMat(maxSize, inline, MatrixType.F32C1))
-            using (CvMat scale_mat = Cv.CreateMat(maxSize, inline, MatrixType.F32C1))
-            using (CvMat rec_mat = Cv.CreateMat(maxSize, inline, MatrixType.F32C1))
+            using (CvMat line_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
+            using (CvMat scale_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
+            using (CvMat rec_mat = Cv.CreateMat(dimension, inline, MatrixType.F32C1))
             {
                 Cv.Zero(rec_mat); // 初期化(0)
                 Cv.Add(rec_mat, mean_mat, rec_mat); // 平均顔を足す
-                for (int i = 0; i < numImage; i++)
+                for (int i = 0; i < eigen_num; i++)
                 {
-                    // 指定した基底を抜き出して再構成
-                    //if (i >= 0 && i < 10) i++;
-
-                    // 1列を取り出す
+                    // 1列を取り出す                 
                     LineGetMat(input_mat, line_mat, i);
-                    Cv.ConvertScale(line_mat, line_mat, Cv.Get2D(pjt_mat, 0, i).Val0, 0);
+                    if (i == eigen_num - 1)
+                    {
+                        Cv.ConvertScale(line_mat, line_mat, Cv.Get2D(pjt_mat, 0, i).Val0, 0);
+                    }
+                    else
+                    {
+                        Cv.ConvertScale(line_mat, line_mat, 1, 0);
+                    }
                     Cv.Add(rec_mat, line_mat, rec_mat);
                     ScaleTrans(rec_mat, scale_mat);
                     MatToImg(scale_mat, dst_img);
 
                     // 再構成顔の書き出し
-                    filename = savefolder + "Reconstitution/" + String.Format("{0:000}", i + 1) + ".jpg";
+                    filename = savefolder + "Reconstitution/" + String.Format("{0:000}_", i + 1) + pjt + ".jpg";
                     Cv.SaveImage(filename, dst_img);
                 }
             }
@@ -174,14 +162,35 @@ namespace CVcs.Analysis
         }
 
         // 行列から画像へ
-        public void MatToImg(CvMat mat, IplImage img)
+        public void MatToImg(CvMat input_mat, IplImage img)
         {
-            for (int y = 0; y < img.Height; y++)
+            using (IplImage imgR = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
+            using (IplImage imgG = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
+            using (IplImage imgB = Cv.CreateImage(Cv.Size(iWidth, iHeight), BitDepth.U8, 1))
             {
-                for (int x = 0; x < img.Width; x++)
+                // 各画素を行列にセット
+                for (int i = 0; i < 3; i++)
                 {
-                    img[y, x] = mat[img.Width * y + x, 0];
+                    for (int y = 0; y < img.Height; y++)
+                    {
+                        for (int x = 0; x < img.Width; x++)
+                        {
+                            if ((iWidth * y + x + i * maxSize) % 3 == 0)
+                            {   // R:0,3,6....
+                                imgR[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // R
+                            }
+                            else if ((iWidth * y + x + i * maxSize) % 3 == 1)
+                            {   // G:1,4,7....
+                                imgG[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // G
+                            }
+                            else
+                            {   // B:2,5,8....
+                                imgB[y, x] = input_mat[img.Width * y + x + i * maxSize, 0]; // B
+                            }
+                        }
+                    }
                 }
+                Cv.Merge(imgB, imgG, imgR, null, img);
             }
         }
 
