@@ -1,5 +1,6 @@
 ## .gitignore ##
 # Folder
+data
 
 # Python
 *.pyc
